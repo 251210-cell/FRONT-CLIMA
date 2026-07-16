@@ -153,7 +153,7 @@ export default function Home() {
 
         {/* Lista de Planes */}
         <section>
-          <h2 className="text-2xl font-extrabold text-slate-800 mb-6">Tus Próximos Plane</h2>
+          <h2 className="text-2xl font-extrabold text-slate-800 mb-6">Tus Próximos Planes</h2>
           <div className="grid gap-6 md:grid-cols-2">
             {planes.map((plan) => (
               <div key={plan.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow relative group flex flex-col justify-between">
