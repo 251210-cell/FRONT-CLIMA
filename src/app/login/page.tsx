@@ -2,17 +2,29 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CloudSun, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { CloudSun, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { authLogin, getApiErrorMessage } from '@/services/api';
 
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/dashboard');
+    setError(null);
+    setLoading(true);
+    try {
+      await authLogin({ email, password });
+      router.push('/dashboard');
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,6 +84,12 @@ export default function Login() {
             </p>
           </div>
 
+          {error && (
+            <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm font-medium text-center">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-sm font-semibold text-slate-800 mb-1.5">
@@ -117,10 +135,15 @@ export default function Login() {
 
             <button
               type="submit"
-              className="w-full py-3.5 px-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full py-3.5 px-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Iniciar sesión
-              <ArrowRight className="w-5 h-5" />
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                <>
+                  Iniciar sesión
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </button>
           </form>
 

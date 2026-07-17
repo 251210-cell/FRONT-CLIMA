@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CloudSun, User, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { CloudSun, User, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { authRegister, getApiErrorMessage } from '@/services/api';
 
 export default function Register() {
   const router = useRouter();
@@ -12,10 +13,27 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/login');
+    setError(null);
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await authRegister({ name, email, password });
+      router.push('/login');
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -75,6 +93,12 @@ export default function Register() {
             </p>
           </div>
 
+          {error && (
+            <div className="mb-5 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm font-medium text-center">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleRegister} className="space-y-5">
             <div>
               <label className="block text-sm font-semibold text-slate-800 mb-1.5">
@@ -88,6 +112,7 @@ export default function Register() {
                   className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  maxLength={100}
                   required
                 />
               </div>
@@ -105,6 +130,7 @@ export default function Register() {
                   className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  maxLength={100}
                   required
                 />
               </div>
@@ -162,10 +188,15 @@ export default function Register() {
 
             <button
               type="submit"
-              className="w-full py-3.5 px-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full py-3.5 px-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Crear cuenta
-              <ArrowRight className="w-5 h-5" />
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                <>
+                  Crear cuenta
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </button>
           </form>
 

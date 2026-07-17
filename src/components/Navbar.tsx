@@ -1,12 +1,17 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { LogOut, CloudSun } from 'lucide-react';
+import { authLogout } from '@/services/api';
 
 export default function Navbar() {
   const router = useRouter();
 
-  const handleLogout = () => {
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await authLogout();
+    } finally {
+      router.push('/login');
+    }
   };
 
   return (
