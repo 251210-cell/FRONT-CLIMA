@@ -27,4 +27,5 @@ export interface Usuario {
     temp: number;
     description: string;
     condition: 'Clear' | 'Rain' | 'Clouds' | 'Snow' | 'Thunderstorm';
+    humidity?: number;
   }

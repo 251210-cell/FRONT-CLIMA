@@ -15,6 +15,8 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   AlertCircle,
+  Droplet,
+  NotebookPen,
   X
 } from 'lucide-react';
 
@@ -105,49 +107,67 @@ export default function Home() {
         
         {/* Controles Principales */}
         <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 gap-4">
-          <div className="flex items-center space-x-3 w-full sm:w-auto bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <MapPin className="text-blue-500 w-5 h-5" />
+          <div className="flex items-center space-x-3 w-full sm:w-auto bg-white p-3 rounded-full border border-slate-200">
+            <MapPin className="text-teal-500 w-5 h-5" />
             <select className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer w-full">
-              <option>Tuxtla Gutiérrez, MX</option>
               <option>Ciudad de México, MX</option>
+              <option>Tuxtla Gutiérrez, MX</option>
             </select>
           </div>
           
           <div className="flex space-x-3 w-full sm:w-auto">
             <button 
               onClick={() => setShowCityModal(true)} 
-              className="flex-1 sm:flex-none px-5 py-3 text-sm font-semibold text-blue-700 bg-blue-50 rounded-xl hover:bg-blue-100 transition"
+              className="flex-1 sm:flex-none px-5 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition"
             >
               + Ciudad
             </button>
             <button 
               onClick={() => setShowPlanModal(true)} 
-              className="flex-1 sm:flex-none px-5 py-3 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-md hover:shadow-lg transition inline-flex items-center justify-center"
+              className="flex-1 sm:flex-none px-5 py-3 text-sm font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 shadow-md hover:shadow-lg transition inline-flex items-center justify-center"
             >
               <CalendarPlus className="w-5 h-5 mr-2" /> 
-              Crear Plan
+              Crear plan
             </button>
           </div>
         </div>
 
         {/* Tarjeta del Clima Actual */}
         {weather && (
-          <section className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl p-8 text-white shadow-xl flex justify-between items-center">
-            <div className="relative z-10">
-              <h2 className="text-lg font-medium text-blue-100 mb-1">Clima Actual</h2>
-              <div className="text-6xl md:text-7xl font-extrabold my-2 tracking-tight">{weather.temp}°</div>
-              <p className="text-xl md:text-2xl font-medium capitalize text-blue-50">{weather.description}</p>
-            </div>
-            <div className="relative z-10">
-              {weather.condition === 'Rain' ? (
-                <CloudRain className="w-32 h-32 md:w-40 md:h-40 text-white drop-shadow-lg" />
-              ) : (
-                <Sun className="w-32 h-32 md:w-40 md:h-40 text-yellow-300 drop-shadow-lg" />
+          <section className="relative overflow-hidden bg-gradient-to-br from-sky-200 via-sky-100 to-blue-100 rounded-3xl p-8 text-slate-900 shadow-sm border border-sky-100 min-h-[260px] flex items-center">
+            {/* Montañas de fondo */}
+            <svg
+              className="absolute bottom-0 left-0 w-full h-40 opacity-70"
+              viewBox="0 0 800 200"
+              preserveAspectRatio="none"
+            >
+              <path d="M0,200 L0,140 C150,60 300,180 450,90 C580,20 680,110 800,60 L800,200 Z" fill="#bcdcf5" />
+            </svg>
+
+            {/* Nubes decorativas */}
+            <CloudRain className="absolute top-10 right-40 w-16 h-16 text-white/70 hidden md:block" />
+
+            <div className="relative z-10 max-w-md">
+              <p className="text-xs font-bold tracking-widest text-slate-500 mb-3 uppercase">
+                Estación · Ciudad de México, MX
+              </p>
+              <div className="text-6xl md:text-7xl font-extrabold my-1 tracking-tight text-slate-900">{weather.temp}°</div>
+              <p className="text-xl text-slate-700 mb-4">{weather.description}</p>
+              {weather.humidity != null && (
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Droplet className="w-4 h-4 text-blue-500" />
+                  <span className="font-medium">{weather.humidity}%</span>
+                </div>
               )}
             </div>
-            {/* Círculos decorativos de fondo */}
-            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-10 blur-2xl"></div>
-            <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-blue-900 opacity-20 blur-xl"></div>
+
+            <div className="relative z-10 ml-auto hidden md:block">
+              {weather.condition === 'Rain' ? (
+                <CloudRain className="w-36 h-36 text-white drop-shadow-md" strokeWidth={1.5} />
+              ) : (
+                <Sun className="w-36 h-36 text-amber-300 drop-shadow-md" strokeWidth={1.5} />
+              )}
+            </div>
           </section>
         )}
 
@@ -164,7 +184,10 @@ export default function Home() {
                       {plan.fecha}
                     </span>
                   </div>
-                  <p className="text-slate-500 text-sm mb-5 font-medium">📝 {plan.notas}</p>
+                  <p className="text-slate-500 text-sm mb-5 font-medium flex items-center gap-1.5">
+                    <NotebookPen className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    {plan.notas}
+                  </p>
                   
                   {weather && evaluarPlan(plan, weather)}
                 </div>
