@@ -87,7 +87,7 @@ export default function Home() {
 
         // Tiempo mínimo de carga para que el spinner sea visible,
         // aunque la API responda muy rápido.
-        const TIEMPO_MINIMO_MS = 800;
+        const TIEMPO_MINIMO_MS = 4000;
         const transcurrido = Date.now() - inicio;
         if (transcurrido < TIEMPO_MINIMO_MS) {
           await new Promise((resolve) => setTimeout(resolve, TIEMPO_MINIMO_MS - transcurrido));
