@@ -8,13 +8,11 @@ import {
   ApiErrorBody,
 } from '../types';
 
-// El backend (awos_poyec2) corre como su propia app Next.js.
-// Configura la URL real en .env.local -> NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1',
-  withCredentials: true, // necesario: el login guarda una cookie httpOnly "token"
+  // Agregamos /api/v1 al final de la URL por defecto
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'https://awospoyec2-production.up.railway.app/api/v1',
+  withCredentials: true, 
 });
-
 // Normaliza los errores del backend ({ code, message, detail }) a un mensaje legible
 export const getApiErrorMessage = (err: unknown): string => {
   const axiosErr = err as AxiosError<ApiErrorBody>;
