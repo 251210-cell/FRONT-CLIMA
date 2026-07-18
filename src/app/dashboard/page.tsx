@@ -12,6 +12,7 @@ import {
   deletePlan,
   getApiErrorMessage,
 } from '@/services/api';
+import { useToast } from '@/components/ToastProvider';
 import { Plan, Ciudad, WeatherData } from '@/types';
 import { 
   CloudRain, 
@@ -26,7 +27,8 @@ import {
   AlertCircle,
   Droplet,
   NotebookPen,
-  X
+  X,
+  ChevronDown
 } from 'lucide-react';
 
 const CLIMA_OPCIONES = [
@@ -36,6 +38,8 @@ const CLIMA_OPCIONES = [
   { value: 'Thunderstorm', label: 'Tormenta' },
   { value: 'Snow', label: 'Nieve' },
 ];
+
+const CLIMA_ADVERSO: WeatherData['condition'][] = ['Rain', 'Thunderstorm', 'Snow'];
 
 export default function Home() {
   const [ciudades, setCiudades] = useState<Ciudad[]>([]);
@@ -63,21 +67,44 @@ export default function Home() {
   const [planSubmitting, setPlanSubmitting] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
 
+  const [planToDelete, setPlanToDelete] = useState<Plan | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const [planToComplete, setPlanToComplete] = useState<Plan | null>(null);
+  const [completing, setCompleting] = useState(false);
+
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+
+  const toast = useToast();
+
   useEffect(() => {
     const fetchCiudades = async () => {
       try {
         setLoading(true);
         setError(null);
+        const inicio = Date.now();
         const data = await getCiudades();
+
+        // Tiempo mínimo de carga para que el spinner sea visible,
+        // aunque la API responda muy rápido.
+        const TIEMPO_MINIMO_MS = 800;
+        const transcurrido = Date.now() - inicio;
+        if (transcurrido < TIEMPO_MINIMO_MS) {
+          await new Promise((resolve) => setTimeout(resolve, TIEMPO_MINIMO_MS - transcurrido));
+        }
+
         setCiudades(data);
         if (data.length > 0) setSelectedCiudadId(data[0].id);
       } catch (err) {
-        setError(getApiErrorMessage(err));
+        const msg = getApiErrorMessage(err);
+        setError(msg);
+        toast.error('No se pudieron cargar tus ciudades', msg);
       } finally {
         setLoading(false);
       }
     };
     fetchCiudades();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -89,7 +116,11 @@ export default function Home() {
       try {
         setError(null);
 
-        const weatherPromise = getCiudadClima(selectedCiudadId).catch(() => null);
+        let weatherFallo = false;
+        const weatherPromise = getCiudadClima(selectedCiudadId).catch(() => {
+          weatherFallo = true;
+          return null;
+        });
         const [weatherData, planesData] = await Promise.all([
           weatherPromise,
           getPlanes(selectedCiudadId),
@@ -97,9 +128,22 @@ export default function Home() {
         if (!cancelado) {
           setWeather(weatherData);
           setPlanes(planesData);
+
+          if (weatherFallo) {
+            toast.warning('No se pudo obtener el clima actual', 'Mostrando la ciudad sin datos meteorológicos.');
+          } else if (weatherData && CLIMA_ADVERSO.includes(weatherData.condition)) {
+            toast.warning(
+              `Clima adverso en ${ciudades.find((c) => c.id === selectedCiudadId)?.nombre ?? 'tu ciudad'}`,
+              `${weatherData.description} — revisa tus planes próximos.`
+            );
+          }
         }
       } catch (err) {
-        if (!cancelado) setError(getApiErrorMessage(err));
+        if (!cancelado) {
+          const msg = getApiErrorMessage(err);
+          setError(msg);
+          toast.error('Error al cargar la ciudad', msg);
+        }
       }
     };
 
@@ -108,6 +152,7 @@ export default function Home() {
     return () => {
       cancelado = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCiudadId]);
 
   const PALABRAS_CLIMA_ADVERSO = ['lluvia', 'tormenta', 'nieve', 'granizo'];
@@ -163,8 +208,11 @@ export default function Home() {
       setCityCodigoPais('');
       setCityCodigoPostal('');
       setShowCityModal(false);
+      toast.success('Ciudad agregada', `${nueva.nombre} ya está en tu lista.`);
     } catch (err) {
-      setCityError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setCityError(msg);
+      toast.error('No se pudo guardar la ciudad', msg);
     } finally {
       setCitySubmitting(false);
     }
@@ -195,28 +243,57 @@ export default function Home() {
       setPlanNotas('');
       setPlanClima('Clear');
       setShowPlanModal(false);
+      toast.success('Plan creado', `"${nuevo.actividad}" se agregó a tu lista.`);
     } catch (err) {
-      setPlanError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setPlanError(msg);
+      toast.error('No se pudo crear el plan', msg);
     } finally {
       setPlanSubmitting(false);
     }
   };
 
-  const handleCompletarPlan = async (id: number) => {
+  const handleCompletarPlan = (id: number) => {
+    const plan = planes.find((p) => p.id === id) ?? null;
+    setPlanToComplete(plan);
+  };
+
+  const confirmCompletePlan = async () => {
+    if (!planToComplete) return;
+    setCompleting(true);
     try {
-      const actualizado = await updatePlan(id, { completado: true });
-      setPlanes((prev) => prev.map((p) => (p.id === id ? actualizado : p)));
+      const actualizado = await updatePlan(planToComplete.id, { completado: true });
+      setPlanes((prev) => prev.map((p) => (p.id === actualizado.id ? actualizado : p)));
+      toast.success('¡Plan completado!', `"${actualizado.actividad}" quedó marcado como hecho.`);
+      setPlanToComplete(null);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setError(msg);
+      toast.error('No se pudo completar el plan', msg);
+    } finally {
+      setCompleting(false);
     }
   };
 
-  const handleEliminarPlan = async (id: number) => {
+  const handleEliminarPlan = (id: number) => {
+    const plan = planes.find((p) => p.id === id) ?? null;
+    setPlanToDelete(plan);
+  };
+
+  const confirmDeletePlan = async () => {
+    if (!planToDelete) return;
+    setDeleting(true);
     try {
-      await deletePlan(id);
-      setPlanes((prev) => prev.filter((p) => p.id !== id));
+      await deletePlan(planToDelete.id);
+      setPlanes((prev) => prev.filter((p) => p.id !== planToDelete.id));
+      toast.info('Plan eliminado', `"${planToDelete.actividad}" se quitó de tu lista.`);
+      setPlanToDelete(null);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setError(msg);
+      toast.error('No se pudo eliminar el plan', msg);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -232,7 +309,7 @@ export default function Home() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="bg-white p-8 rounded-2xl text-center shadow-xl border border-red-100 max-w-md">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl text-center shadow-xl border border-red-100 max-w-md">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-slate-800 mb-2">¡Ups! Algo salió mal</h2>
           <p className="text-slate-600 mb-6">{error}</p>
@@ -253,20 +330,47 @@ export default function Home() {
       <main className="max-w-5xl mx-auto p-6 md:p-8 space-y-8">
         
         <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 gap-4">
-          <div className="flex items-center space-x-3 w-full sm:w-auto bg-white p-3 rounded-full border border-slate-200">
-            <MapPin className="text-teal-500 w-5 h-5" />
-            <select
-              className="bg-transparent text-slate-800 font-semibold outline-none cursor-pointer w-full"
-              value={selectedCiudadId ?? ''}
-              onChange={(e) => setSelectedCiudadId(Number(e.target.value))}
+          <div className="relative w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setCityDropdownOpen((v) => !v)}
+              disabled={ciudades.length === 0}
+              className="flex items-center gap-3 w-full sm:w-auto bg-white p-3 rounded-full border border-slate-200 hover:border-slate-300 transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {ciudades.length === 0 && <option value="">Sin ciudades registradas</option>}
-              {ciudades.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}, {c.codigoPais}
-                </option>
-              ))}
-            </select>
+              <MapPin className="text-teal-500 w-5 h-5 flex-shrink-0" />
+              <span className="text-slate-800 font-semibold truncate">
+                {ciudadActual ? `${ciudadActual.nombre}, ${ciudadActual.codigoPais}` : 'Sin ciudades registradas'}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 ml-auto sm:ml-1 transition-transform ${cityDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {cityDropdownOpen && ciudades.length > 0 && (
+              <>
+                {/* Overlay invisible para cerrar el dropdown al hacer click afuera */}
+                <div className="fixed inset-0 z-10" onClick={() => setCityDropdownOpen(false)} />
+                <div className="absolute left-0 top-full mt-2 w-full sm:w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-20 max-h-64 overflow-y-auto">
+                  {ciudades.map((c) => {
+                    const activa = c.id === selectedCiudadId;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCiudadId(c.id);
+                          setCityDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between text-left px-4 py-2.5 text-sm font-medium transition ${
+                          activa ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>{c.nombre}, {c.codigoPais}</span>
+                        {activa && <Check className="w-4 h-4 flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
           
           <div className="flex space-x-3 w-full sm:w-auto">
@@ -383,7 +487,7 @@ export default function Home() {
 
         {showCityModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="bg-white p-6 sm:p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
               <button onClick={() => setShowCityModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-700 transition">
                 <X className="w-6 h-6" />
               </button>
@@ -460,7 +564,7 @@ export default function Home() {
 
         {showPlanModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="bg-white p-6 sm:p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
               <button onClick={() => setShowPlanModal(false)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-700 transition">
                 <X className="w-6 h-6" />
               </button>
@@ -527,6 +631,76 @@ export default function Home() {
                 >
                   {planSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar Plan
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {planToComplete && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 sm:p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
+              <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-green-50 mx-auto mb-5">
+                <Check className="w-7 h-7 text-green-600" />
+              </div>
+
+              <h3 className="font-extrabold text-xl mb-2 text-slate-800 text-center">
+                ¿Marcar como completado?
+              </h3>
+              <p className="text-slate-500 text-center mb-8">
+                &quot;{planToComplete.actividad}&quot; se marcará como completado.
+              </p>
+
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => setPlanToComplete(null)}
+                  disabled={completing}
+                  className="flex-1 px-5 py-3 font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmCompletePlan}
+                  disabled={completing}
+                  className="flex-1 px-5 py-3 font-semibold bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                >
+                  {completing && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Sí, completar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {planToDelete && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 sm:p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
+              <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-red-50 mx-auto mb-5">
+                <Trash2 className="w-7 h-7 text-red-500" />
+              </div>
+
+              <h3 className="font-extrabold text-xl mb-2 text-slate-800 text-center">
+                ¿Eliminar este plan?
+              </h3>
+              <p className="text-slate-500 text-center mb-8">
+                &quot;{planToDelete.actividad}&quot; se eliminará permanentemente. Esta acción no se puede deshacer.
+              </p>
+
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => setPlanToDelete(null)}
+                  disabled={deleting}
+                  className="flex-1 px-5 py-3 font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeletePlan}
+                  disabled={deleting}
+                  className="flex-1 px-5 py-3 font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                >
+                  {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Sí, eliminar
                 </button>
               </div>
             </div>

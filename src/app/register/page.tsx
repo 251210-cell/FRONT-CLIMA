@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CloudSun, User, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { authRegister, getApiErrorMessage } from '@/services/api';
+import { useToast } from '@/components/ToastProvider';
 
 export default function Register() {
   const router = useRouter();
@@ -15,22 +16,28 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.');
+      const msg = 'Las contraseñas no coinciden.';
+      setError(msg);
+      toast.warning('Revisa tus datos', msg);
       return;
     }
 
     setLoading(true);
     try {
       await authRegister({ name, email, password });
+      toast.success('Cuenta creada', 'Ahora inicia sesión para continuar.');
       router.push('/login');
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      const msg = getApiErrorMessage(err);
+      setError(msg);
+      toast.error('No se pudo crear la cuenta', msg);
     } finally {
       setLoading(false);
     }

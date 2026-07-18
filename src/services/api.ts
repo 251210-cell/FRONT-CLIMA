@@ -41,6 +41,25 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Si el servidor responde 401 (token vencido/ inválido), limpiamos la sesión
+// y mandamos al login con una bandera para mostrar la alerta de "sesión expirada".
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (
+      typeof window !== 'undefined' &&
+      error.response?.status === 401 &&
+      !window.location.pathname.startsWith('/login') &&
+      !window.location.pathname.startsWith('/register')
+    ) {
+      clearToken();
+      clearStoredUsuario();
+      window.location.href = '/login?expired=1';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ================= USER STORAGE =================
 
 const USER_KEY = 'auth_user';
