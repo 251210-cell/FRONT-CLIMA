@@ -38,21 +38,17 @@ const CLIMA_OPCIONES = [
 ];
 
 export default function Home() {
-  // Datos
   const [ciudades, setCiudades] = useState<Ciudad[]>([]);
   const [selectedCiudadId, setSelectedCiudadId] = useState<number | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [planes, setPlanes] = useState<Plan[]>([]);
 
-  // UI
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modales
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
 
-  // Formulario nueva ciudad
   const [cityNombre, setCityNombre] = useState('');
   const [cityEstado, setCityEstado] = useState('');
   const [cityCodigoPais, setCityCodigoPais] = useState('');
@@ -60,7 +56,6 @@ export default function Home() {
   const [citySubmitting, setCitySubmitting] = useState(false);
   const [cityError, setCityError] = useState<string | null>(null);
 
-  // Formulario nuevo plan
   const [planActividad, setPlanActividad] = useState('');
   const [planFecha, setPlanFecha] = useState('');
   const [planNotas, setPlanNotas] = useState('');
@@ -68,7 +63,6 @@ export default function Home() {
   const [planSubmitting, setPlanSubmitting] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
 
-  // Carga inicial ciudades del usuario
   useEffect(() => {
     const fetchCiudades = async () => {
       try {
@@ -86,7 +80,6 @@ export default function Home() {
     fetchCiudades();
   }, []);
 
-  // Carga de clima + planes cuando cambia la ciudad seleccionada
   useEffect(() => {
     if (selectedCiudadId == null) return;
 
@@ -95,8 +88,10 @@ export default function Home() {
     const fetchCiudadData = async () => {
       try {
         setError(null);
+
+        const weatherPromise = getCiudadClima(selectedCiudadId).catch(() => null);
         const [weatherData, planesData] = await Promise.all([
-          getCiudadClima(selectedCiudadId),
+          weatherPromise,
           getPlanes(selectedCiudadId),
         ]);
         if (!cancelado) {
@@ -115,25 +110,38 @@ export default function Home() {
     };
   }, [selectedCiudadId]);
 
-  // Lógica que cruza el clima actual con lo esperado del plan (regla de negocio)
-  const evaluarPlan = (plan: Plan, climaActual: WeatherData) => {
-    if (climaActual.condition === 'Rain' && plan.climaEsperado === 'Clear') {
+  const PALABRAS_CLIMA_ADVERSO = ['lluvia', 'tormenta', 'nieve', 'granizo'];
+
+  const evaluarPlan = (plan: Plan) => {
+    if (!plan.climaEsperado) {
       return (
-        <div className="flex items-center text-amber-700 bg-amber-50 p-3 rounded-xl mb-4 border border-amber-100">
-          <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0" />
-          <span className="text-sm font-medium">Advertencia: Lluvia pronosticada. Tu actividad podría arruinarse.</span>
+        <div className="flex items-center text-slate-600 bg-slate-50 p-3 rounded-xl mb-4 border border-slate-100">
+          <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <span className="text-sm font-medium">Clima pendiente por confirmar.</span>
         </div>
       );
     }
+
+    const textoClima = plan.climaEsperado.toLowerCase();
+    const esAdverso = PALABRAS_CLIMA_ADVERSO.some((palabra) => textoClima.includes(palabra));
+
+    if (esAdverso) {
+      return (
+        <div className="flex items-center text-amber-700 bg-amber-50 p-3 rounded-xl mb-4 border border-amber-100">
+          <AlertTriangle className="w-5 h-5 mr-2 flex-shrink-0" />
+          <span className="text-sm font-medium">Advertencia: {plan.climaEsperado}. Tu actividad podría verse afectada.</span>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center text-green-700 bg-green-50 p-3 rounded-xl mb-4 border border-green-100">
         <CheckCircle2 className="w-5 h-5 mr-2 flex-shrink-0" />
-        <span className="text-sm font-medium">¡Clima ideal para esta actividad!</span>
+        <span className="text-sm font-medium">¡Clima ideal! {plan.climaEsperado}</span>
       </div>
     );
   };
 
-  // Guardar nueva ciudad
   const handleSaveCity = async () => {
     setCityError(null);
     if (!cityNombre.trim() || cityCodigoPais.trim().length !== 2) {
@@ -162,7 +170,6 @@ export default function Home() {
     }
   };
 
-  // Guardar nuevo plan
   const handleSavePlan = async () => {
     setPlanError(null);
     if (selectedCiudadId == null) {
@@ -195,7 +202,6 @@ export default function Home() {
     }
   };
 
-  // Completar y eliminar plan
   const handleCompletarPlan = async (id: number) => {
     try {
       const actualizado = await updatePlan(id, { completado: true });
@@ -214,7 +220,6 @@ export default function Home() {
     }
   };
 
-  // PANTALLA CARGANDO
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
@@ -224,7 +229,6 @@ export default function Home() {
     );
   }
 
-  // PANTALLA ERROR
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
@@ -242,14 +246,12 @@ export default function Home() {
 
   const ciudadActual = ciudades.find((c) => c.id === selectedCiudadId);
 
-  // PANTALLA PRINCIPAL (SUCCESS)
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       <Navbar />
       
       <main className="max-w-5xl mx-auto p-6 md:p-8 space-y-8">
         
-        {/* Controles Principales */}
         <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 gap-4">
           <div className="flex items-center space-x-3 w-full sm:w-auto bg-white p-3 rounded-full border border-slate-200">
             <MapPin className="text-teal-500 w-5 h-5" />
@@ -285,10 +287,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Tarjeta del Clima Actual */}
         {weather && ciudadActual && (
           <section className="relative overflow-hidden bg-gradient-to-br from-sky-200 via-sky-100 to-blue-100 rounded-3xl p-8 text-slate-900 shadow-sm border border-sky-100 min-h-[260px] flex items-center">
-            {/* Montañas de fondo */}
             <svg
               className="absolute bottom-0 left-0 w-full h-40 opacity-70"
               viewBox="0 0 800 200"
@@ -297,7 +297,6 @@ export default function Home() {
               <path d="M0,200 L0,140 C150,60 300,180 450,90 C580,20 680,110 800,60 L800,200 Z" fill="#bcdcf5" />
             </svg>
 
-            {/* Nubes decorativas */}
             <CloudRain className="absolute top-10 right-40 w-16 h-16 text-white/70 hidden md:block" />
 
             <div className="relative z-10 max-w-md">
@@ -330,7 +329,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Lista de Planes */}
         {ciudades.length > 0 && (
           <section>
             <h2 className="text-2xl font-extrabold text-slate-800 mb-6">Tus Próximos Planes</h2>
@@ -358,7 +356,7 @@ export default function Home() {
                         </p>
                       )}
 
-                      {weather && evaluarPlan(plan, weather)}
+                      {evaluarPlan(plan)}
                     </div>
 
                     <div className="flex space-x-3 pt-4 border-t border-slate-100 mt-auto">
@@ -383,9 +381,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* ================= MODALES ================= */}
-        
-        {/* Modal: Registrar Ciudad */}
         {showCityModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
@@ -463,7 +458,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Modal: Crear Plan */}
         {showPlanModal && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">

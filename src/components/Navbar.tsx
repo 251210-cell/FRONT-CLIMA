@@ -1,10 +1,20 @@
 'use client';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, CloudSun } from 'lucide-react';
-import { authLogout } from '@/services/api';
+import { authLogout, getStoredUsuario } from '@/services/api';
+import { Usuario } from '@/types';
 
 export default function Navbar() {
   const router = useRouter();
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+
+  useEffect(() => {
+    // Se lee localStorage aquí (no durante el render) para evitar un
+    // hydration mismatch: el servidor no tiene acceso a localStorage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUsuario(getStoredUsuario());
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -24,7 +34,7 @@ export default function Navbar() {
       </div>
       <div className="flex items-center space-x-6">
         <span className="text-slate-500 text-sm">
-          Hola, <span className="text-slate-700">Usuario</span>
+          Hola, <span className="text-slate-700">{usuario?.name ?? 'Usuario'}</span>
         </span>
         <button onClick={handleLogout} className="flex items-center text-red-500 hover:text-red-600 text-sm font-medium transition">
           <LogOut className="w-4 h-4 mr-1.5" /> Salir

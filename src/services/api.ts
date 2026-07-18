@@ -9,11 +9,58 @@ import {
 } from '../types';
 
 const api = axios.create({
-  // Agregamos /api/v1 al final de la URL por defecto
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'https://awospoyec2-production.up.railway.app/api/v1',
-  withCredentials: true, 
+  withCredentials: true,
 });
-// Normaliza los errores del backend ({ code, message, detail }) a un mensaje legible
+
+// ================= TOKEN STORAGE =================
+
+const TOKEN_KEY = 'auth_token';
+
+export const getToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(TOKEN_KEY);
+};
+
+const setToken = (token: string) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TOKEN_KEY, token);
+};
+
+const clearToken = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(TOKEN_KEY);
+};
+
+// Adjunta el token guardado como Authorization header en cada petición
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// ================= USER STORAGE =================
+
+const USER_KEY = 'auth_user';
+
+export const getStoredUsuario = (): Usuario | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(USER_KEY);
+  return raw ? JSON.parse(raw) : null;
+};
+
+const setStoredUsuario = (usuario: Usuario) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(USER_KEY, JSON.stringify(usuario));
+};
+
+const clearStoredUsuario = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(USER_KEY);
+};
+
 export const getApiErrorMessage = (err: unknown): string => {
   const axiosErr = err as AxiosError<ApiErrorBody>;
   return axiosErr.response?.data?.detail ?? 'Error al conectar con el servidor. Intenta de nuevo.';
@@ -27,13 +74,21 @@ export const authRegister = async (data: { name: string; email: string; password
 };
 
 export const authLogin = async (data: { email: string; password: string }) => {
-  const res = await api.post<ApiResponse<{ usuario: Usuario }>>('/auth/login', data);
-  return res.data.data.usuario;
+  const res = await api.post<ApiResponse<{ token: string; usuario: Usuario }>>('/auth/login', data);
+  const { token, usuario } = res.data.data;
+  setToken(token);
+  setStoredUsuario(usuario);
+  return usuario;
 };
 
 export const authLogout = async () => {
-  const res = await api.post<ApiResponse<{ message: string }>>('/auth/logout', {});
-  return res.data.data;
+  try {
+    const res = await api.post<ApiResponse<{ message: string }>>('/auth/logout', {});
+    return res.data.data;
+  } finally {
+    clearToken();
+    clearStoredUsuario();
+  }
 };
 
 // ================= USERS =================
@@ -119,14 +174,10 @@ export const deletePlan = async (id: number) => {
 };
 
 // ================= CLIMA =================
-// El backend todavía no tiene endpoint de clima (no existe /api/v1/clima).
-// Se deja simulado a propósito hasta que se implemente esa ruta.
-export const getCiudadClima = async (_idCiudad: number): Promise<WeatherData> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ temp: 24, description: 'Lluvia ligera', condition: 'Rain', humidity: 68 });
-    }, 800);
-  });
+
+export const getCiudadClima = async (idCiudad: number): Promise<WeatherData> => {
+  const res = await api.get<ApiResponse<WeatherData>>(`/ciudades/${idCiudad}/clima-actual`);
+  return res.data.data;
 };
 
 export default api;
