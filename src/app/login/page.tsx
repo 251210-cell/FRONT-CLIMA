@@ -129,6 +129,7 @@ function LoginForm() {
             </div>
 
             <div>
+        
               <label className="block text-sm font-semibold text-slate-800 mb-1.5">
                 Contraseña
               </label>
